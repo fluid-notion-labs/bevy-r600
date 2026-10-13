@@ -3,14 +3,28 @@
     reason = "This module acts as a wrapper around the `raw_window_handle` crate, which exposes many unsafe interfaces; thus, we have to use unsafe code here."
 )]
 
+use alloc::boxed::Box;
 use alloc::sync::Arc;
-use bevy_ecs::prelude::Component;
+use bevy_ecs::prelude::{Component, Resource};
 use bevy_platform::sync::Mutex;
 use core::{any::Any, marker::PhantomData, ops::Deref};
 use raw_window_handle::{
     DisplayHandle, HandleError, HasDisplayHandle, HasWindowHandle, RawDisplayHandle,
     RawWindowHandle, WindowHandle,
 };
+
+/// Platform display handle captured from the windowing system's event loop,
+/// available before any window exists.
+///
+/// `bevy_winit` inserts this resource when it creates the event loop;
+/// `bevy_render` reads it when creating the wgpu `Instance`. wgpu's GL backend
+/// requires the display handle at instance-creation time to select the
+/// platform EGL display (Wayland/X11); without it, wgpu falls back to
+/// surfaceless EGL, which cannot present to a window.
+#[derive(Resource, Default)]
+pub struct InstanceDisplayHandle(
+    pub Option<Box<dyn HasDisplayHandle + Send + Sync + 'static>>,
+);
 
 /// A wrapper over a window.
 ///

@@ -176,20 +176,53 @@ async fn find_adapter_by_name(
     None
 }
 
+/// Adapter adding the `Debug` bound required by [`wgpu::wgt::WgpuHasDisplayHandle`]
+/// to a boxed display handle captured before any window exists (required by
+/// wgpu's GL backend on Wayland/X11).
+struct InstanceDisplayHandleAdapter(
+    Box<dyn raw_window_handle::HasDisplayHandle + Send + Sync + 'static>,
+);
+
+impl std::fmt::Debug for InstanceDisplayHandleAdapter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("InstanceDisplayHandleAdapter").finish()
+    }
+}
+
+impl raw_window_handle::HasDisplayHandle for InstanceDisplayHandleAdapter {
+    fn display_handle(
+        &self,
+    ) -> Result<raw_window_handle::DisplayHandle<'_>, raw_window_handle::HandleError> {
+        self.0.display_handle()
+    }
+}
+
 /// Initializes the renderer by retrieving and preparing the GPU instance, device and queue
 /// for the specified backend.
 pub async fn initialize_renderer(
     backends: Backends,
     primary_window: Option<RawHandleWrapperHolder>,
+    instance_display: Option<Box<dyn raw_window_handle::HasDisplayHandle + Send + Sync + 'static>>,
     options: &WgpuSettings,
     #[cfg(feature = "raw_vulkan_init")]
     raw_vulkan_init_settings: raw_vulkan_init::RawVulkanInitSettings,
 ) -> RenderResources {
+    // bevy upstream (0.19.1) hardcodes display: None. wgpu 29's GL backend
+    // requires the display handle at instance-creation time to pick the
+    // Wayland/X11 EGL platform; without it wgpu falls back to surfaceless
+    // EGL, which cannot create window surfaces, so present modes come back
+    // empty and surface setup panics. bevy_winit captures the event loop's
+    // display handle in `bevy_window::InstanceDisplayHandle`; pass it through.
+    let instance_display: Option<Box<dyn wgpu::wgt::WgpuHasDisplayHandle>> =
+        instance_display.map(|handle| {
+            Box::new(InstanceDisplayHandleAdapter(handle))
+                as Box<dyn wgpu::wgt::WgpuHasDisplayHandle>
+        });
     let instance_descriptor = wgpu::InstanceDescriptor {
         backends,
         flags: options.instance_flags,
         memory_budget_thresholds: options.instance_memory_budget_thresholds,
-        display: None,
+        display: instance_display,
         backend_options: wgpu::BackendOptions {
             gl: wgpu::GlBackendOptions {
                 gles_minor_version: options.gles3_minor_version,

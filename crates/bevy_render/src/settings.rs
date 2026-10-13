@@ -8,6 +8,7 @@ use alloc::borrow::Cow;
 use bevy_ecs::world::World;
 use bevy_image::{CompressedImageFormatSupport, CompressedImageFormats};
 use bevy_window::RawHandleWrapperHolder;
+use raw_window_handle::HasDisplayHandle;
 
 use wgpu::MemoryBudgetThresholds;
 pub use wgpu::{
@@ -260,6 +261,7 @@ impl RenderCreation {
         &self,
         future_resources: FutureRenderResources,
         primary_window: Option<RawHandleWrapperHolder>,
+        instance_display: Option<Box<dyn HasDisplayHandle + Send + Sync + 'static>>,
         #[cfg(feature = "raw_vulkan_init")]
         raw_vulkan_init_settings: renderer::raw_vulkan_init::RawVulkanInitSettings,
     ) -> bool {
@@ -277,6 +279,7 @@ impl RenderCreation {
                     let render_resources = renderer::initialize_renderer(
                         backends,
                         primary_window,
+                        instance_display,
                         &settings,
                         #[cfg(feature = "raw_vulkan_init")]
                         raw_vulkan_init_settings,

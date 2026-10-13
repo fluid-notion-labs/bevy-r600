@@ -119,6 +119,9 @@ profiling = { version = "1", features = [
   "profile-with-tracing",
 ], optional = true }
 async-channel = "2.3.0"
+# For the wgpu InstanceDescriptor display handle (r600/GL patch, see
+# src/renderer/mod.rs).
+raw-window-handle = { version = "0.6", default-features = false }
 nonmax = "0.5"
 smallvec = { version = "1", default-features = false, features = ["const_new"] }
 offset-allocator = "0.2"

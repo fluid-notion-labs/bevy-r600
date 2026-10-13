@@ -330,7 +330,12 @@ fn sample_shadow_cubemap_hardware(light_local: vec3<f32>, depth: f32, light_id: 
         depth
     );
 #else
-    return textureSampleCompareLevel(
+    // textureSampleCompareLevel (explicit level 0) makes naga emit
+    // textureLod(samplerCubeArrayShadow, ...), which only exists via
+    // GL_EXT_texture_shadow_lod — unsupported on r600 (pre-GCN AMD).
+    // textureSampleCompare (implicit level) maps to core
+    // texture(samplerCubeArrayShadow, P, compare), GL 4.0+.
+    return textureSampleCompare(
         view_bindings::point_shadow_textures,
         view_bindings::point_shadow_textures_comparison_sampler,
         light_local,

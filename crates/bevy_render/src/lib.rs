@@ -507,6 +507,14 @@ fn insert_future_resources(render_creation: &RenderCreation, main_world: &mut Wo
         .ok()
         .cloned();
 
+    // Display handle captured by bevy_winit at event-loop creation, before
+    // any window exists. Required by wgpu's GL backend (see
+    // `bevy_window::InstanceDisplayHandle`).
+    // Consumed (taken) here: the instance is created exactly once.
+    let instance_display = main_world
+        .get_resource_mut::<bevy_window::InstanceDisplayHandle>()
+        .and_then(|mut handle| handle.0.take());
+
     #[cfg(feature = "raw_vulkan_init")]
     let raw_vulkan_init_settings = main_world
         .get_resource::<renderer::raw_vulkan_init::RawVulkanInitSettings>()
@@ -517,6 +525,7 @@ fn insert_future_resources(render_creation: &RenderCreation, main_world: &mut Wo
     let success = render_creation.create_render(
         future_resources.clone(),
         primary_window,
+        instance_display,
         #[cfg(feature = "raw_vulkan_init")]
         raw_vulkan_init_settings,
     );

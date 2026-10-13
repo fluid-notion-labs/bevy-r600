@@ -130,6 +130,12 @@ impl Plugin for WinitPlugin {
         app.init_resource::<WinitMonitors>()
             .init_resource::<WinitSettings>()
             .insert_resource(DisplayHandleWrapper(event_loop.owned_display_handle()))
+            // Display handle for the wgpu render instance (see
+            // bevy_window::InstanceDisplayHandle). Must be inserted here,
+            // before RenderPlugin::build reads it.
+            .insert_resource(bevy_window::InstanceDisplayHandle(Some(Box::new(
+                event_loop.owned_display_handle(),
+            ))))
             .insert_resource(EventLoopProxyWrapper(event_loop.create_proxy()))
             .add_message::<RawWinitWindowEvent>()
             .set_runner(|app| winit_runner(app, event_loop))
