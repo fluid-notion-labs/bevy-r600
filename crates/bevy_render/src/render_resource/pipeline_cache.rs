@@ -637,6 +637,17 @@ impl PipelineCache {
     /// be called manually to force creation at a different time.
     ///
     /// [`RenderSystems::Render`]: crate::RenderSystems::Render
+    /// Maximum number of pipelines started per `process_queue` call while
+    /// compiling synchronously.
+    ///
+    /// Synchronous compilation blocks the render thread inside
+    /// `Device::create_*_pipeline`, which on slow GLES drivers can take a
+    /// while per pipeline. Starting every pending pipeline in one frame
+    /// blocks that frame for tens of seconds — long enough for Android to
+    /// declare the app unresponsive (ANR) and kill it. Spreading the work
+    /// over frames keeps each frame short; total startup time is unchanged.
+    const SYNC_PIPELINES_PER_FRAME: usize = 2;
+
     pub fn process_queue(&mut self) {
         let mut waiting_pipelines = mem::take(&mut self.waiting_pipelines);
         let mut pipelines = mem::take(&mut self.pipelines);
@@ -653,7 +664,19 @@ impl PipelineCache {
             }
         }
 
+        // In synchronous mode only a limited number of pipelines may block
+        // on compilation per frame; the rest are put back and processed in
+        // later frames.
+        let limit = self
+            .synchronous_pipeline_compilation
+            .then_some(Self::SYNC_PIPELINES_PER_FRAME);
+        let mut started = 0;
         for id in waiting_pipelines {
+            if limit.is_some_and(|max| started >= max) {
+                self.waiting_pipelines.insert(id);
+                continue;
+            }
+            started += 1;
             self.process_pipeline(&mut pipelines[id], id);
         }
 
